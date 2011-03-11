@@ -42,11 +42,13 @@
 
 
 
-(defun request (authenticated-user resource-url)
-  (let ((result (access-protected-resource (format nil "~a/~a/~a.json"
+(defun request (authenticated-user resource-url &optional query)
+  (let ((result (access-protected-resource (format nil
+                                                   "~a/~a/~a.json~@[?query=~a~]"
                                                    +base-url+
                                                    +api-version+
-                                                   resource-url)
+                                                   resource-url
+                                                   (url-encode query))
                                            (access-token authenticated-user))))
     (decode-json-from-string (if (stringp result)
                                  result
@@ -117,10 +119,8 @@
 (defun activity (activity-id)
   (request (format nil "/activities/~a" activity-id)))
 
-#|
 (defun search-foods (query)
   (request "/foods/search" query))
-|#
 
 ;; TODO: seems like we should call this once and cache it or something
 (defun food-units ()
