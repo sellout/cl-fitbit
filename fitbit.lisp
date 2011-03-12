@@ -101,7 +101,14 @@
   (brand id name units))
 
 (defclass food-instance (user-proxy)
-  (amount brand calories food-id meal-type-id name unit units))
+  ((amount :initarg amount :accessor amount)
+   (brand :reader brand)
+   (calories :reader calories)
+   food-id
+   meal-type-id
+   (name :reader name)
+   (unit :initarg unit :accessor unit)
+   units))
 
 (defclass food-unit (user-proxy)
   (name plural id))
