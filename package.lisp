@@ -29,6 +29,10 @@
            #:bmi-time-series
            #:fat-time-series
 
+           #:log #:add-favorite
+
+           #:delete-log #:delete-favorite
+
            #:search-foods
            #:food-units
            

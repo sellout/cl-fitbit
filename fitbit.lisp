@@ -250,26 +250,6 @@
 (define-time-series bmi "/body/bmi")
 (define-time-series fat "/body/fat")
 
-(defun %activity (proxy activity-id)
-  (request proxy (format nil "/activities/~a" activity-id)))
-
-(defun search-foods (proxy query)
-  (request proxy "/foods/search" :parameters `(("query" . ,query))))
-
-(defun food-units (proxy)
-  (request proxy "/foods/units"))
-
-(defun devices (user)
-  (mapcar (lambda (object) (parse-json 'device object :parent user))
-          (request user (format nil "/user/~a/devices" (user-id? user)))))
-
-(defun device-attributes (device)
-  (parse-json 'device
-              (car (request device
-                            (format nil "/user/~a/devices/~a"
-                                    (user-id? device) (slot-value device 'id))))
-              :existing-object device))
-
 ;;; Logging User Data
 
 (defmethod (setf weight) (weight user date)
@@ -280,7 +260,7 @@
                          ("date" . ,date)))
   weight)
 
-(defgeneric log (instance &key unit-system)
+(defgeneric log (instance)
   (:method ((instance activity-instance))
     (request instance
              (format nil "/user/~a/activities" (user-id? instance))
@@ -302,3 +282,67 @@
                            ("amount" . ,(amount instance))
                            ;;("date")
                            ))))
+
+(defgeneric add-favorite (instance)
+  (:method ((instance activity))
+    (request instance
+             (format nil "/user/~a/activities/log/favorite/~a"
+                     (user-id? instance) (slot-value instance 'id))
+             :request-method :post))
+  (:method ((instance food))
+    (request instance
+             (format nil "/user/~a/foods/log/favorite/~a"
+                     (user-id? instance) (slot-value instance 'id))
+             :request-method :post)))
+
+;;; Deleting User Data
+
+(defgeneric delete-log (instance)
+  (:method ((instance activity-instance))
+    (request instance
+             (format nil "/user/~a/activities/~a"
+                     (user-id? instance) (slot-value instance 'id))
+             :method :delete))
+  (:method ((instance food-instance))
+    (request instance
+             (format nil "/user/~a/foods/log/~a"
+                     (user-id? instance) (slot-value instance 'id))
+             :method :delete)))
+
+(defgeneric delete-favorite (instance)
+  (:method ((instance activity))
+    (request instance
+             (format nil "/user/~a/activities/log/favorite/~a"
+                     (user-id? instance) (slot-value instance 'id))
+             :method :delete))
+  (:method ((instance food))
+    (request instance
+             (format nil "/user/~a/foods/favorite/~a"
+                     (user-id? instance) (slot-value instance 'id))
+             :method :delete)))
+
+;;; General Activity Data
+
+(defun %activity (proxy activity-id)
+  (request proxy (format nil "/activities/~a" activity-id)))
+
+;;; General Food Data
+
+(defun search-foods (proxy query)
+  (request proxy "/foods/search" :parameters `(("query" . ,query))))
+
+(defun food-units (proxy)
+  (request proxy "/foods/units"))
+
+;;; Device Data
+
+(defun devices (user)
+  (mapcar (lambda (object) (parse-json 'device object :parent user))
+          (request user (format nil "/user/~a/devices" (user-id? user)))))
+
+(defun device-attributes (device)
+  (parse-json 'device
+              (car (request device
+                            (format nil "/user/~a/devices/~a"
+                                    (user-id? device) (slot-value device 'id))))
+              :existing-object device))
