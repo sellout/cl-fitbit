@@ -28,12 +28,12 @@
 (defclass food-unit ()
   (name plural id))
 
-
+(defun make-fitbit-consumer (key secret)
+  (make-consumer-token :key key :secret secret))
 
 ;; NOTE: setting up oauth
 (defun get-authentication-url (consumer &optional callback-url)
   (let ((token (apply #'obtain-request-token +request-url+ consumer
-                      :request-method :auth
                       (if callback-url (list :callback-uri callback-url)))))
     (make-authorization-uri +auth-request-url+ token)))
 
