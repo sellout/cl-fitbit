@@ -11,7 +11,8 @@
 (defclass user ()
   (about-me city country date-of-birth display-name encoded-id full-name gender
    height nickname offset-from-utc state stride-length-running
-   stride-length-walking timezone))
+   stride-length-walking timezone
+   (access-token :initarg :access-token :reader access-token)))
 
 (defclass activity-level ()
   (id min-speed max-speed name))
@@ -47,7 +48,10 @@
     (setf (request-token-authorized-p request-token) t)
     (obtain-access-token +access-url+ request-token :consumer-token consumer)))
 
-(defun request (access-token resource-url &optional query)
+(defun get-authorized-user (consumer uri)
+  (make-instance 'user :access-token (get-access-token consumer uri)))
+
+(defun request (authorized-user resource-url &optional query)
   (let ((result (access-protected-resource
                  (merge-uris (format nil
                                      "/~a~a.json~@[?query=~a~]"
@@ -56,7 +60,7 @@
                                      (when query
                                        (url-encode query)))
                              +base-url+)
-                 access-token
+                 (access-token authorized-user)
                  :request-method :auth)))
     (print (if (stringp result)
                result
@@ -65,46 +69,58 @@
                                  result
                                  (babel:octets-to-string result)))))
 
-(defun activities-for (date &optional user-id)
-  (request (format nil "/user/~a/activities/date/~a" (or user-id "-") date)))
+(defun activities-for (authorized-user date &optional user-id)
+  (request authorized-user
+           (format nil "/user/~a/activities/date/~a" (or user-id "-") date)))
 
-(defun recent-activities (&optional user-id)
-  (request (format nil "/user/~a/activities/recent" (or user-id "-"))))
+(defun recent-activities (authorized-user &optional user-id)
+  (request authorized-user
+           (format nil "/user/~a/activities/recent" (or user-id "-"))))
 
-(defun frequent-activities (&optional user-id)
-  (request (format nil "/user/~a/activities/frequent" (or user-id "-"))))
+(defun frequent-activities (authorized-user &optional user-id)
+  (request authorized-user
+           (format nil "/user/~a/activities/frequent" (or user-id "-"))))
 
-(defun favorite-activities (&optional user-id)
-  (request (format nil "/user/~a/activities/favorite" (or user-id "-"))))
+(defun favorite-activities (authorized-user &optional user-id)
+  (request authorized-user
+           (format nil "/user/~a/activities/favorite" (or user-id "-"))))
 
-(defun profile (&optional user-id)
-  (request (format nil "/user/~a/profile" (or user-id "-"))))
+(defun profile (authorized-user &optional user-id)
+  (request authorized-user
+           (format nil "/user/~a/profile" (or user-id "-"))))
 
-(defun foods-for (date &optional user-id)
-  (request (format nil "/user/~a/foods/log/date/~a" (or user-id "-") date)))
+(defun foods-for (authorized-user date &optional user-id)
+  (request authorized-user
+           (format nil "/user/~a/foods/log/date/~a" (or user-id "-") date)))
 
-(defun recent-foods (&optional user-id)
-  (request (format nil "/user/~a/foods/log/recent" (or user-id "-"))))
+(defun recent-foods (authorized-user &optional user-id)
+  (request authorized-user
+           (format nil "/user/~a/foods/log/recent" (or user-id "-"))))
 
-(defun frequent-foods (&optional user-id)
-  (request (format nil "/user/~a/foods/log/frequent" (or user-id "-"))))
+(defun frequent-foods (authorized-user &optional user-id)
+  (request authorized-user
+           (format nil "/user/~a/foods/log/frequent" (or user-id "-"))))
 
-(defun favorite-foods (&optional user-id)
-  (request (format nil "/user/~a/foods/log/favorite" (or user-id "-"))))
+(defun favorite-foods (authorized-user &optional user-id)
+  (request authorized-user
+           (format nil "/user/~a/foods/log/favorite" (or user-id "-"))))
 
 ;; NOTE: this is internal and is wrapped to receive specific resources
-(defun resource (resource-path &key start-date end-date period user-id)
+(defun resource
+    (authorized-user resource-path &key start-date end-date period user-id)
   ;; FIXME: must provide end-date and exactly one of start-date and period
-  (request (format nil "/user/~a~a/date/~a/~a"
+  (request authorized-user
+           (format nil "/user/~a~a/date/~a/~a"
                    (or user-id "-")
                    resource-path
                    (or start-date end-date)
                    (or period end-date))))
 
 (defmacro defresource (name path)
-  `(defun ,name (&rest args &key start-date end-date period user-id)
+  `(defun ,name
+       (authorized-user &rest args &key start-date end-date period user-id)
      (declare (ignore start-date end-date period user-id))
-     (apply #'resource ,path args)))
+     (apply #'resource authorized-user ,path args)))
 
 (defresource calories-in "/foods/log/caloriesIn")
 
@@ -127,18 +143,18 @@
 (defresource bmi "/body/bmi")
 (defresource fat "/body/fat")
 
-(defun activity (activity-id)
-  (request (format nil "/activities/~a" activity-id)))
+(defun activity (authorized-user activity-id)
+  (request authorized-user (format nil "/activities/~a" activity-id)))
 
-(defun search-foods (query)
-  (request "/foods/search" query))
+(defun search-foods (authorized-user query)
+  (request authorized-user "/foods/search" query))
 
-;; TODO: seems like we should call this once and cache it or something
-(defun food-units ()
-  (request "/foods/units"))
+(defun food-units (authorized-user)
+  (request authorized-user "/foods/units"))
 
-(defun devices (&optional user-id)
-  (request (format nil "/user/~a/devices" (or user-id "-"))))
+(defun devices (authorized-user &optional user-id)
+  (request authorized-user (format nil "/user/~a/devices" (or user-id "-"))))
 
-(defun device-attributes (device-id &optional user-id)
-  (request (format nil "/user/~a/devices/~a" (or user-id "-") device-id)))
+(defun device-attributes (authorized-user device-id &optional user-id)
+  (request authorized-user
+           (format nil "/user/~a/devices/~a" (or user-id "-") device-id)))
