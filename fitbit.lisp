@@ -3,11 +3,10 @@
 ;;; NOTE: The API is documented at http://wiki.fitbit.com/display/API
 
 (defconstant +api-version+ 1)
-(defvar +base-url+ "http://api.fitbit.com")
-(defvar +request-url+ (concatenate 'string +base-url+ "/oauth/request_token"))
-(defvar +auth-request-url+
-  (concatenate 'string +base-url+ "/oauth/authorize"))
-(defvar +access-url+ (concatenate 'string +base-url+ "/oauth/access_token"))
+(defvar +base-url+ (uri "http://api.fitbit.com/"))
+(defvar +request-url+ (merge-uris "/oauth/request_token" +base-url+))
+(defvar +auth-request-url+ (merge-uris "/oauth/authorize" +base-url+))
+(defvar +access-url+ (merge-uris "/oauth/access_token" +base-url+))
 
 (defclass user ()
   (about-me city country date-of-birth display-name encoded-id full-name gender
@@ -29,27 +28,39 @@
 (defclass food-unit ()
   (name plural id))
 
+
+
 ;; NOTE: setting up oauth
-(defun get-authentication-url (key secret callback-url)
-  (let ((token (obtain-request-token +request-url+
-                                     (make-consumer-token :key key
-                                                          :secret secret)
-                                     :callback-uri  callback-url)))
+(defun get-authentication-url (consumer &optional callback-url)
+  (let ((token (apply #'obtain-request-token +request-url+ consumer
+                      :request-method :auth
+                      (if callback-url (list :callback-uri callback-url)))))
     (make-authorization-uri +auth-request-url+ token)))
 
-(defun get-access-token (url)
-  (obtain-access-token +access-url+ (make-access-token :origin-uri url)))
+(defun get-access-token (consumer uri)
+  (let* ((query (mapcar (lambda (param) (split-sequence #\= param))
+                        (split-sequence #\& (uri-query uri))))
+         (token (cadr (assoc "oauth_token" query :test #'string=)))
+         (verifier (cadr (assoc "oauth_verifier" query :test #'string=)))
+         (request-token (make-request-token :key token
+                                            :verification-code verifier)))
+    (setf (request-token-authorized-p request-token) t)
+    (obtain-access-token +access-url+ request-token :consumer-token consumer)))
 
-
-
-(defun request (authenticated-user resource-url &optional query)
-  (let ((result (access-protected-resource (format nil
-                                                   "~a/~a/~a.json~@[?query=~a~]"
-                                                   +base-url+
-                                                   +api-version+
-                                                   resource-url
-                                                   (url-encode query))
-                                           (access-token authenticated-user))))
+(defun request (access-token resource-url &optional query)
+  (let ((result (access-protected-resource
+                 (merge-uris (format nil
+                                     "/~a~a.json~@[?query=~a~]"
+                                     +api-version+
+                                     resource-url
+                                     (when query
+                                       (url-encode query)))
+                             +base-url+)
+                 access-token
+                 :request-method :auth)))
+    (print (if (stringp result)
+               result
+               (babel:octets-to-string result)))
     (decode-json-from-string (if (stringp result)
                                  result
                                  (babel:octets-to-string result)))))
