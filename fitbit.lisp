@@ -36,8 +36,12 @@
    (state :reader state)
    (stride-length-running :reader stride-length-running)
    (stride-length-walking :reader stride-length-walking)
-   (timezone :reader timezone)
-   (access-token :initarg :access-token :reader access-token)))
+   (timezone :reader timezone)))
+
+(defclass authorized-user (user)
+  ((access-token :initarg :access-token :reader access-token)
+   (preferred-unit-system :initform nil :initarg :preferred-unit-system
+                          :reader preferred-unit-system)))
 
 (defmethod slot-unbound :around
     ((class (eql (find-class 'user))) instance slot-name)
@@ -97,8 +101,10 @@
     (setf (request-token-authorized-p request-token) t)
     (obtain-access-token +access-url+ request-token :consumer-token consumer)))
 
-(defun get-authorized-user (consumer uri)
-  (make-instance 'user :access-token (get-access-token consumer uri)))
+(defun get-authorized-user (consumer uri &key preferred-unit-system)
+  (make-instance 'authorized-user
+                 :access-token (get-access-token consumer uri)
+                 :preferred-unit-system preferred-unit-system))
 
 (defun request
     (authorized-user resource-url unit-system
@@ -112,7 +118,9 @@
                  (access-token authorized-user)
                  :request-method request-method
                  :user-parameters parameters
-                 :additional-headers (case unit-system
+                 :additional-headers (case (or unit-system
+                                               (preferred-unit-system
+                                                authorized-user))
                                        (:us '(("Accept-Language" . "en_US")))
                                        (:uk '(("Accept-Language" . "en_UK")))
                                        (otherwise '())))))
