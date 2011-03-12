@@ -16,6 +16,11 @@
           json)
   existing-object)
 
+(define-condition fitbit-error (error)
+  ((error-type)
+   (field-name)
+   (message)))
+
 (defclass user ()
   ((about-me :reader about-me)
    (city :reader city)
@@ -44,12 +49,7 @@
 (defun parse-user (json &optional (existing-user (make-instance 'user)))
   (let ((object (car json)))
     (assert (eq (car object) :user))
-    (mapcar (lambda (pair)
-              (setf (slot-value existing-user
-                                (find-symbol (symbol-name (car pair)) :fitbit))
-                    (cdr pair)))
-            (cdr object)))
-  existing-user)
+    (parse-json 'user (cdr object) existing-user)))
 
 (defclass activity-level ()
   (id min-speed max-speed name))
@@ -96,17 +96,17 @@
 (defun get-authorized-user (consumer uri)
   (make-instance 'user :access-token (get-access-token consumer uri)))
 
-(defun request (authorized-user resource-url &optional query)
+(defun request
+    (authorized-user resource-url &key (request-method :get) parameters)
   (let ((result (access-protected-resource
                  (merge-uris (format nil
-                                     "/~a~a.json~@[?query=~a~]"
+                                     "/~a~a.json"
                                      +api-version+
-                                     resource-url
-                                     (when query
-                                       (url-encode query)))
+                                     resource-url)
                              +base-url+)
                  (access-token authorized-user)
-                 :request-method :auth)))
+                 :request-method request-method
+                 :user-parameters parameters)))
     (decode-json-from-string (if (stringp result)
                                  result
                                  (babel:octets-to-string result)))))
@@ -197,11 +197,11 @@
 (defresource bmi "/body/bmi")
 (defresource fat "/body/fat")
 
-(defun activity (authorized-user activity-id)
+(defun %activity (authorized-user activity-id)
   (request authorized-user (format nil "/activities/~a" activity-id)))
 
 (defun search-foods (authorized-user query)
-  (request authorized-user "/foods/search" query))
+  (request authorized-user "/foods/search" :parameters `(("query" . ,query))))
 
 (defun food-units (authorized-user)
   (request authorized-user "/foods/units"))
@@ -217,3 +217,17 @@
                             (format nil "/user/~a/devices/~a"
                                     (user-id? user) (slot-value device 'id))))
               device))
+
+
+
+;;; Logging User Data
+
+
+
+(defmethod (setf weight) (weight authenticated-user date &optional user)
+  (request authenticated-user
+           (format nil "/user/~a/body/weight" (user-id? user))
+           :request-method :post
+           :parameters `(("weight" . ,(format nil "~a" weight))
+                         ("date" . ,date)))
+  weight)
