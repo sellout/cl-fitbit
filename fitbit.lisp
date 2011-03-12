@@ -9,9 +9,21 @@
 (defvar +access-url+ (merge-uris "/oauth/access_token" +base-url+))
 
 (defclass user ()
-  (about-me city country date-of-birth display-name encoded-id full-name gender
-   height nickname offset-from-+utc+-millis state stride-length-running
-   stride-length-walking timezone
+  ((about-me :reader about-me)
+   (city :reader city)
+   (country :reader country)
+   (date-of-birth :reader date-of-birth)
+   (display-name :reader display-name)
+   (encoded-id :initarg :encoded-id :reader encoded-id)
+   (full-name :reader full-name)
+   (gender :reader gender)
+   (height :reader height)
+   (nickname :reader nickname)
+   (offset-from-+utc+-millis :reader offset-from-+utc+-millis)
+   (state :reader state)
+   (stride-length-running :reader stride-length-running)
+   (stride-length-walking :reader stride-length-walking)
+   (timezone :reader timezone)
    (access-token :initarg :access-token :reader access-token)))
 
 (defmethod slot-unbound :around
