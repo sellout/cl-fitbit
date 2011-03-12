@@ -62,9 +62,6 @@
                              +base-url+)
                  (access-token authorized-user)
                  :request-method :auth)))
-    (print (if (stringp result)
-               result
-               (babel:octets-to-string result)))
     (decode-json-from-string (if (stringp result)
                                  result
                                  (babel:octets-to-string result)))))
