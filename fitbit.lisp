@@ -10,9 +10,20 @@
 
 (defclass user ()
   (about-me city country date-of-birth display-name encoded-id full-name gender
-   height nickname offset-from-utc state stride-length-running
+   height nickname offset-from-+utc+-millis state stride-length-running
    stride-length-walking timezone
    (access-token :initarg :access-token :reader access-token)))
+
+(defun parse-user (json &optional (existing-user (make-instance 'user)))
+  (let ((object (car json)))
+    (assert (eq (car object) :user))
+    (mapcar (lambda (pair)
+              (print (find-symbol (symbol-name (car pair)) :fitbit))
+              (setf (slot-value existing-user
+                                (find-symbol (symbol-name (car pair)) :fitbit))
+                    (cdr pair)))
+            (cdr object)))
+  existing-user)
 
 (defclass activity-level ()
   (id min-speed max-speed name))
@@ -83,8 +94,11 @@
            (format nil "/user/~a/activities/favorite" (or user-id "-"))))
 
 (defun profile (authorized-user &optional user-id)
-  (request authorized-user
-           (format nil "/user/~a/profile" (or user-id "-"))))
+  (let ((json (request authorized-user
+                       (format nil "/user/~a/profile" (or user-id "-")))))
+    (if user-id
+        (parse-user json)
+        (parse-user json authorized-user))))
 
 (defun foods-for (authorized-user date &optional user-id)
   (request authorized-user
