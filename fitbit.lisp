@@ -14,11 +14,17 @@
    stride-length-walking timezone
    (access-token :initarg :access-token :reader access-token)))
 
+(defmethod slot-unbound :around
+    ((class (eql (find-class 'user))) instance slot-name)
+  (profile instance)
+  (if (slot-boundp instance slot-name)
+      (slot-value instance slot-name)
+      (call-next-method)))
+
 (defun parse-user (json &optional (existing-user (make-instance 'user)))
   (let ((object (car json)))
     (assert (eq (car object) :user))
     (mapcar (lambda (pair)
-              (print (find-symbol (symbol-name (car pair)) :fitbit))
               (setf (slot-value existing-user
                                 (find-symbol (symbol-name (car pair)) :fitbit))
                     (cdr pair)))
