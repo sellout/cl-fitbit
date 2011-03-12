@@ -101,7 +101,8 @@
   (make-instance 'user :access-token (get-access-token consumer uri)))
 
 (defun request
-    (authorized-user resource-url &key (request-method :get) parameters)
+    (authorized-user resource-url unit-system
+     &key (request-method :get) parameters)
   (let ((result (access-protected-resource
                  (merge-uris (format nil
                                      "/~a~a.json"
@@ -110,7 +111,11 @@
                              +base-url+)
                  (access-token authorized-user)
                  :request-method request-method
-                 :user-parameters parameters)))
+                 :user-parameters parameters
+                 :additional-headers (case unit-system
+                                       (:us '(("Accept-Language" . "en_US")))
+                                       (:uk '(("Accept-Language" . "en_UK")))
+                                       (otherwise '())))))
     (decode-json-from-string (if (stringp result)
                                  result
                                  (babel:octets-to-string result)))))
@@ -119,71 +124,83 @@
   "This gets the user-id, or “-” if the user is NIL."
   (if user (encoded-id user) "-"))
 
-(defun activities-for (authorized-user date &optional user)
+(defun activities-for (authorized-user date &key target-user unit-system)
   "Returns two values – a list of ACTIVITY-INSTANCEs and an ACTIVITY-SUMMARY for
    the day."
   (let ((json (request authorized-user
                        (format nil "/user/~a/activities/date/~a"
-                               (user-id? user) date))))
+                               (user-id? target-user) date)
+                       unit-system)))
     (values (mapcar (lambda (object) (parse-json 'activity-instance object))
                     (cdr (first json)))
             (parse-json 'activity-summary (cdr (second json))))))
 
-(defun recent-activities (authorized-user &optional user)
+(defun recent-activities (authorized-user &key target-user unit-system)
   (mapcar (lambda (object) (parse-json 'activity-instance object))
           (request authorized-user
-                   (format nil "/user/~a/activities/recent" (user-id? user)))))
+                   (format nil "/user/~a/activities/recent" (user-id? target-user))
+                   unit-system)))
 
-(defun frequent-activities (authorized-user &optional user)
+(defun frequent-activities (authorized-user &key target-user unit-system)
   (mapcar (lambda (object) (parse-json 'activity-instance object))
           (request authorized-user
                    (format nil "/user/~a/activities/frequent"
-                           (user-id? user)))))
+                           (user-id? target-user))
+                   unit-system)))
 
-(defun favorite-activities (authorized-user &optional user)
+(defun favorite-activities (authorized-user &key target-user unit-system)
   (mapcar (lambda (object) (parse-json 'activity-instance object))
           (request authorized-user
                    (format nil "/user/~a/activities/favorite"
-                           (user-id? user)))))
+                           (user-id? target-user))
+                   unit-system)))
 
-(defun profile (authorized-user &optional user)
+(defun profile (authorized-user &key target-user unit-system)
   (let ((json (request authorized-user
-                       (format nil "/user/~a/profile" (user-id? user)))))
-    (if user
-        (parse-user json user)
+                       (format nil "/user/~a/profile" (user-id? target-user))
+                       unit-system)))
+    (if target-user
+        (parse-user json target-user)
         (parse-user json authorized-user))))
 
-(defun foods-for (authorized-user date &optional user)
+(defun foods-for (authorized-user date &key target-user unit-system)
   (request authorized-user
-           (format nil "/user/~a/foods/log/date/~a" (user-id? user) date)))
+           (format nil "/user/~a/foods/log/date/~a" (user-id? target-user) date)
+           unit-system))
 
-(defun recent-foods (authorized-user &optional user)
+(defun recent-foods (authorized-user &key target-user unit-system)
   (request authorized-user
-           (format nil "/user/~a/foods/log/recent" (user-id? user))))
+           (format nil "/user/~a/foods/log/recent" (user-id? target-user))
+           unit-system))
 
-(defun frequent-foods (authorized-user &optional user)
+(defun frequent-foods (authorized-user &key target-user unit-system)
   (request authorized-user
-           (format nil "/user/~a/foods/log/frequent" (user-id? user))))
+           (format nil "/user/~a/foods/log/frequent" (user-id? target-user))
+           unit-system))
 
-(defun favorite-foods (authorized-user &optional user)
+(defun favorite-foods (authorized-user &key target-user unit-system)
   (request authorized-user
-           (format nil "/user/~a/foods/log/favorite" (user-id? user))))
+           (format nil "/user/~a/foods/log/favorite" (user-id? target-user))
+           unit-system))
 
 ;; NOTE: this is internal and is wrapped to receive specific resources
 (defun resource
-    (authorized-user resource-path &key start-date end-date period user)
+    (authorized-user resource-path
+     &key start-date end-date period target-user unit-system)
   ;; FIXME: must provide end-date and exactly one of start-date and period
   (request authorized-user
            (format nil "/user/~a~a/date/~a/~a"
-                   (user-id? user)
+                   (user-id? target-user)
                    resource-path
                    (or start-date end-date)
-                   (or period end-date))))
+                   (or period end-date))
+           unit-system))
 
 (defmacro defresource (name path)
   `(defun ,name
-       (authorized-user &rest args &key start-date end-date period user)
-     (declare (ignore start-date end-date period user))
+       (authorized-user
+        &rest args &key start-date end-date period target-user unit-system)
+     (declare (ignore start-date end-date period target-user unit-system))
      (apply #'resource authorized-user ,path args)))
 
 (defresource calories-in "/foods/log/caloriesIn")
@@ -207,25 +224,31 @@
 (defresource bmi "/body/bmi")
 (defresource fat "/body/fat")
 
-(defun %activity (authorized-user activity-id)
-  (request authorized-user (format nil "/activities/~a" activity-id)))
+(defun %activity (authorized-user activity-id &key unit-system)
+  (request authorized-user
+           (format nil "/activities/~a" activity-id)
+           unit-system))
 
-(defun search-foods (authorized-user query)
-  (request authorized-user "/foods/search" :parameters `(("query" . ,query))))
+(defun search-foods (authorized-user query &key unit-system)
+  (request authorized-user "/foods/search" unit-system
+           :parameters `(("query" . ,query))))
 
 (defun food-units (authorized-user)
-  (request authorized-user "/foods/units"))
+  (request authorized-user "/foods/units" nil))
 
-(defun devices (authorized-user &optional user)
+(defun devices (authorized-user &key target-user unit-system)
   (mapcar (lambda (object) (parse-json 'device object))
           (request authorized-user
-                   (format nil "/user/~a/devices" (user-id? user)))))
+                   (format nil "/user/~a/devices" (user-id? target-user))
+                   unit-system)))
 
-(defun device-attributes (authorized-user device &optional user)
+(defun device-attributes (authorized-user device &key target-user unit-system)
   (parse-json 'device
               (car (request authorized-user
                             (format nil "/user/~a/devices/~a"
-                                    (user-id? user) (slot-value device 'id))))
+                                    (user-id? target-user)
+                                    (slot-value device 'id))
+                            unit-system))
               device))
 
 
@@ -234,9 +257,11 @@
 
 
 
-(defmethod (setf weight) (weight authenticated-user date &optional user)
+(defmethod (setf weight)
+    (weight authenticated-user date &key target-user unit-system)
   (request authenticated-user
-           (format nil "/user/~a/body/weight" (user-id? user))
+           (format nil "/user/~a/body/weight" (user-id? target-user))
+           unit-system
            :request-method :post
            :parameters `(("weight" . ,(format nil "~a" weight))
                          ("date" . ,date)))
