@@ -66,6 +66,10 @@
    (duration)
    (name)))
 
+(defclass activity-summary ()
+  (active-score calories-out distances fairly-active-minutes
+   lightly-active-minutes sedentary-minutes steps very-active-minutes))
+
 (defclass device ()
   (battery id type))
 
@@ -116,8 +120,14 @@
   (if user (encoded-id user) "-"))
 
 (defun activities-for (authorized-user date &optional user)
-  (request authorized-user
-           (format nil "/user/~a/activities/date/~a" (user-id? user) date)))
+  "Returns two values – a list of ACTIVITY-INSTANCEs and an ACTIVITY-SUMMARY for
+   the day."
+  (let ((json (request authorized-user
+                       (format nil "/user/~a/activities/date/~a"
+                               (user-id? user) date))))
+    (values (mapcar (lambda (object) (parse-json 'activity-instance object))
+                    (cdr (first json)))
+            (parse-json 'activity-summary (cdr (second json))))))
 
 (defun recent-activities (authorized-user &optional user)
   (mapcar (lambda (object) (parse-json 'activity-instance object))
