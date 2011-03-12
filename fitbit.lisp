@@ -8,6 +8,14 @@
 (defvar +auth-request-url+ (merge-uris "/oauth/authorize" +base-url+))
 (defvar +access-url+ (merge-uris "/oauth/access_token" +base-url+))
 
+(defun parse-json (class json &optional (existing-object (make-instance class)))
+  (mapcar (lambda (pair)
+            (setf (slot-value existing-object
+                              (find-symbol (symbol-name (car pair)) :fitbit))
+                  (cdr pair)))
+          json)
+  existing-object)
+
 (defclass user ()
   ((about-me :reader about-me)
    (city :reader city)
@@ -49,8 +57,17 @@
 (defclass activity ()
   (activity-levels has-speed-p id name))
 
+(defclass activity-instance ()
+  ((activity)
+   (activity-id)
+   (calories)
+   (description)
+   (distance)
+   (duration)
+   (name)))
+
 (defclass device ()
-  (battery id))
+  (battery id type))
 
 (defclass food ()
   (brand id name units))
@@ -103,16 +120,21 @@
            (format nil "/user/~a/activities/date/~a" (user-id? user) date)))
 
 (defun recent-activities (authorized-user &optional user)
-  (request authorized-user
-           (format nil "/user/~a/activities/recent" (user-id? user))))
+  (mapcar (lambda (object) (parse-json 'activity-instance object))
+          (request authorized-user
+                   (format nil "/user/~a/activities/recent" (user-id? user)))))
 
 (defun frequent-activities (authorized-user &optional user)
-  (request authorized-user
-           (format nil "/user/~a/activities/frequent" (user-id? user))))
+  (mapcar (lambda (object) (parse-json 'activity-instance object))
+          (request authorized-user
+                   (format nil "/user/~a/activities/frequent"
+                           (user-id? user)))))
 
 (defun favorite-activities (authorized-user &optional user)
-  (request authorized-user
-           (format nil "/user/~a/activities/favorite" (user-id? user))))
+  (mapcar (lambda (object) (parse-json 'activity-instance object))
+          (request authorized-user
+                   (format nil "/user/~a/activities/favorite"
+                           (user-id? user)))))
 
 (defun profile (authorized-user &optional user)
   (let ((json (request authorized-user
@@ -185,8 +207,13 @@
   (request authorized-user "/foods/units"))
 
 (defun devices (authorized-user &optional user)
-  (request authorized-user (format nil "/user/~a/devices" (user-id? user))))
+  (mapcar (lambda (object) (parse-json 'device object))
+          (request authorized-user
+                   (format nil "/user/~a/devices" (user-id? user)))))
 
-(defun device-attributes (authorized-user device-id &optional user)
-  (request authorized-user
-           (format nil "/user/~a/devices/~a" (user-id? user) device-id)))
+(defun device-attributes (authorized-user device &optional user)
+  (parse-json 'device
+              (car (request authorized-user
+                            (format nil "/user/~a/devices/~a"
+                                    (user-id? user) (slot-value device 'id))))
+              device))
