@@ -101,6 +101,9 @@
 (defclass food (user-proxy)
   (brand id name units))
 
+(defclass food-instance (user-proxy)
+  (amount brand calories food-id meal-type-id name unit units))
+
 (defclass food-unit (user-proxy)
   (name plural id))
 
@@ -289,14 +292,27 @@
                          ("date" . ,date)))
   weight)
 
-(defmethod log ((instance activity-instance) &key unit-system)
-  (request instance
-           (format nil "/user/~a/activities" (user-id? instance))
-           unit-system
-           :request-method :post
-           :parameters `(("activityId" . ,(slot-value instance 'activity-id))
-                         ("durationMillis" . ,(duration instance))
-                         ("distance" . ,(distance instance)) 
-                         ;;("date")
-                         ;;("startTime")
-                         )))
+(defgeneric log (instance &key unit-system)
+  (:method ((instance activity-instance) &key unit-system)
+    (request instance
+             (format nil "/user/~a/activities" (user-id? instance))
+             unit-system
+             :request-method :post
+             :parameters `(("activityId" . ,(slot-value instance 'activity-id))
+                           ("durationMillis" . ,(duration instance))
+                           ("distance" . ,(distance instance)) 
+                           ;;("date")
+                           ;;("startTime")
+                           )))
+  (:method ((instance food-instance) &key unit-system)
+    (request instance
+             (format nil "/user/~a/foods/log" (user-id? instance))
+             unit-system
+             :request-method :post
+             :parameters `(("foodId" . ,(slot-value instance 'food-id))
+                           ("mealTypeId" . ,(slot-value instance
+                                                            'meal-type-id))
+                           ("unitId" . ,(slot-value (unit instance) 'id))
+                           ("amount" . ,(amount instance))
+                           ;;("date")
+                           ))))
