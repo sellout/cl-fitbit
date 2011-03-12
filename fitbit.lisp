@@ -61,7 +61,6 @@
 (defun make-fitbit-consumer (key secret)
   (make-consumer-token :key key :secret secret))
 
-;; NOTE: setting up oauth
 (defun get-authentication-url (consumer &optional callback-url)
   (let ((token (apply #'obtain-request-token +request-url+ consumer
                       (if callback-url (list :callback-uri callback-url)))))
@@ -95,60 +94,64 @@
                                  result
                                  (babel:octets-to-string result)))))
 
-(defun activities-for (authorized-user date &optional user-id)
-  (request authorized-user
-           (format nil "/user/~a/activities/date/~a" (or user-id "-") date)))
+(defun user-id? (user)
+  "This gets the user-id, or “-” if the user is NIL."
+  (if user (encoded-id user) "-"))
 
-(defun recent-activities (authorized-user &optional user-id)
+(defun activities-for (authorized-user date &optional user)
   (request authorized-user
-           (format nil "/user/~a/activities/recent" (or user-id "-"))))
+           (format nil "/user/~a/activities/date/~a" (user-id? user) date)))
 
-(defun frequent-activities (authorized-user &optional user-id)
+(defun recent-activities (authorized-user &optional user)
   (request authorized-user
-           (format nil "/user/~a/activities/frequent" (or user-id "-"))))
+           (format nil "/user/~a/activities/recent" (user-id? user))))
 
-(defun favorite-activities (authorized-user &optional user-id)
+(defun frequent-activities (authorized-user &optional user)
   (request authorized-user
-           (format nil "/user/~a/activities/favorite" (or user-id "-"))))
+           (format nil "/user/~a/activities/frequent" (user-id? user))))
 
-(defun profile (authorized-user &optional user-id)
+(defun favorite-activities (authorized-user &optional user)
+  (request authorized-user
+           (format nil "/user/~a/activities/favorite" (user-id? user))))
+
+(defun profile (authorized-user &optional user)
   (let ((json (request authorized-user
-                       (format nil "/user/~a/profile" (or user-id "-")))))
-    (if user-id
-        (parse-user json)
+                       (format nil "/user/~a/profile" (user-id? user)))))
+    (if user
+        (parse-user json user)
         (parse-user json authorized-user))))
 
-(defun foods-for (authorized-user date &optional user-id)
+(defun foods-for (authorized-user date &optional user)
   (request authorized-user
-           (format nil "/user/~a/foods/log/date/~a" (or user-id "-") date)))
+           (format nil "/user/~a/foods/log/date/~a" (user-id? user) date)))
 
-(defun recent-foods (authorized-user &optional user-id)
+(defun recent-foods (authorized-user &optional user)
   (request authorized-user
-           (format nil "/user/~a/foods/log/recent" (or user-id "-"))))
+           (format nil "/user/~a/foods/log/recent" (user-id? user))))
 
-(defun frequent-foods (authorized-user &optional user-id)
+(defun frequent-foods (authorized-user &optional user)
   (request authorized-user
-           (format nil "/user/~a/foods/log/frequent" (or user-id "-"))))
+           (format nil "/user/~a/foods/log/frequent" (user-id? user))))
 
-(defun favorite-foods (authorized-user &optional user-id)
+(defun favorite-foods (authorized-user &optional user)
   (request authorized-user
-           (format nil "/user/~a/foods/log/favorite" (or user-id "-"))))
+           (format nil "/user/~a/foods/log/favorite" (user-id? user))))
 
 ;; NOTE: this is internal and is wrapped to receive specific resources
 (defun resource
-    (authorized-user resource-path &key start-date end-date period user-id)
+    (authorized-user resource-path &key start-date end-date period user)
   ;; FIXME: must provide end-date and exactly one of start-date and period
   (request authorized-user
            (format nil "/user/~a~a/date/~a/~a"
-                   (or user-id "-")
+                   (user-id? user)
                    resource-path
                    (or start-date end-date)
                    (or period end-date))))
 
 (defmacro defresource (name path)
   `(defun ,name
-       (authorized-user &rest args &key start-date end-date period user-id)
-     (declare (ignore start-date end-date period user-id))
+       (authorized-user &rest args &key start-date end-date period user)
+     (declare (ignore start-date end-date period user))
      (apply #'resource authorized-user ,path args)))
 
 (defresource calories-in "/foods/log/caloriesIn")
@@ -181,9 +184,9 @@
 (defun food-units (authorized-user)
   (request authorized-user "/foods/units"))
 
-(defun devices (authorized-user &optional user-id)
-  (request authorized-user (format nil "/user/~a/devices" (or user-id "-"))))
+(defun devices (authorized-user &optional user)
+  (request authorized-user (format nil "/user/~a/devices" (user-id? user))))
 
-(defun device-attributes (authorized-user device-id &optional user-id)
+(defun device-attributes (authorized-user device-id &optional user)
   (request authorized-user
-           (format nil "/user/~a/devices/~a" (or user-id "-") device-id)))
+           (format nil "/user/~a/devices/~a" (user-id? user) device-id)))
