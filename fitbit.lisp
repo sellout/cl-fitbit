@@ -43,8 +43,7 @@
 
 (defclass authorized-user (user)
   ((access-token :initarg :access-token :reader access-token)
-   (preferred-unit-system :initform nil :initarg :preferred-unit-system
-                          :reader preferred-unit-system)))
+   (unit-system :initform nil :initarg :unit-system :accessor unit-system)))
 
 (defclass user-proxy ()
   ((parent :initarg :parent :accessor parent :type parent))
@@ -125,14 +124,14 @@
     (setf (request-token-authorized-p request-token) t)
     (obtain-access-token +access-url+ request-token :consumer-token consumer)))
 
-(defun get-authorized-user (consumer uri &key preferred-unit-system)
+(defun get-authorized-user (consumer uri &key unit-system)
   (make-instance 'authorized-user
                  :access-token (get-access-token consumer uri)
-                 :preferred-unit-system preferred-unit-system))
+                 :unit-system unit-system))
 
 (defgeneric request
-    (user resource-url unit-system &key request-method parameters)
-  (:method ((instance authorized-user) resource-url unit-system
+    (user resource-url &key request-method parameters)
+  (:method ((instance authorized-user) resource-url
             &key (request-method :get) parameters)
     (let ((result (access-protected-resource
                    (merge-uris (format nil
@@ -143,18 +142,17 @@
                    (access-token instance)
                    :request-method request-method
                    :user-parameters parameters
-                   :additional-headers (case (or unit-system
-                                                 (preferred-unit-system instance))
+                   :additional-headers (case (unit-system instance)
                                          (:us '(("Accept-Language" . "en_US")))
                                          (:uk '(("Accept-Language" . "en_UK")))
                                          (otherwise '())))))
       (decode-json-from-string (if (stringp result)
                                    result
                                    (babel:octets-to-string result)))))
-  (:method ((instance user-proxy) resource-url unit-system &rest args
+  (:method ((instance user-proxy) resource-url &rest args
             &key (request-method :get) parameters)
     (declare (ignore request-method parameters))
-    (apply #'request (parent instance) resource-url unit-system args)))
+    (apply #'request (parent instance) resource-url args)))
 
 (defgeneric user-id? (user)
   (:documentation "This gets the user-id of the “nearest” user to the object, or
@@ -163,77 +161,65 @@
   (:method ((instance target-user))     (encoded-id instance))
   (:method ((instance user-proxy))      (user-id? (parent instance))))
 
-(defun activities-for (user date &key unit-system)
+(defun activities-for (user date)
   (let ((json (request user
                        (format nil "/user/~a/activities/date/~a"
-                               (user-id? user) date)
-                       unit-system)))
+                               (user-id? user) date))))
     (values (mapcar (lambda (object) (parse-json 'activity-instance object
                                                  :parent user))
                     (cdr (first json)))
             (parse-json 'activity-summary (cdr (second json)) :parent user))))
 
-(defun recent-activities (user &key unit-system)
+(defun recent-activities (user)
   (mapcar (lambda (object) (parse-json 'activity-instance object :parent user))
           (request user
-                   (format nil "/user/~a/activities/recent" (user-id? user))
-                   unit-system)))
+                   (format nil "/user/~a/activities/recent" (user-id? user)))))
 
-(defun frequent-activities (user &key unit-system)
+(defun frequent-activities (user)
   (mapcar (lambda (object) (parse-json 'activity-instance object :parent user))
           (request user
                    (format nil "/user/~a/activities/frequent"
-                           (user-id? user))
-                   unit-system)))
+                           (user-id? user)))))
 
-(defun favorite-activities (user &key unit-system)
+(defun favorite-activities (user)
   (mapcar (lambda (object) (parse-json 'activity-instance object :parent user))
           (request user
-                   (format nil "/user/~a/activities/favorite" (user-id? user))
-                   unit-system)))
+                   (format nil "/user/~a/activities/favorite"
+                           (user-id? user)))))
 
-(defun profile (user &key unit-system)
-  (parse-user (request user
-                       (format nil "/user/~a/profile" (user-id? user))
-                       unit-system)
+(defun profile (user)
+  (parse-user (request user (format nil "/user/~a/profile" (user-id? user)))
               user))
 
-(defun foods-for (user date &key unit-system)
+(defun foods-for (user date)
   (request user
-           (format nil "/user/~a/foods/log/date/~a" (user-id? user) date)
-           unit-system))
+           (format nil "/user/~a/foods/log/date/~a" (user-id? user) date)))
 
-(defun recent-foods (user &key unit-system)
+(defun recent-foods (user)
   (request user
-           (format nil "/user/~a/foods/log/recent" (user-id? user))
-           unit-system))
+           (format nil "/user/~a/foods/log/recent" (user-id? user))))
 
-(defun frequent-foods (user &key unit-system)
-  (request user
-           (format nil "/user/~a/foods/log/frequent" (user-id? user))
-           unit-system))
+(defun frequent-foods (user)
+  (request user (format nil "/user/~a/foods/log/frequent" (user-id? user))))
 
-(defun favorite-foods (user &key unit-system)
-  (request user
-           (format nil "/user/~a/foods/log/favorite" (user-id? user))
-           unit-system))
+(defun favorite-foods (user)
+  (request user (format nil "/user/~a/foods/log/favorite" (user-id? user))))
 
 ;; NOTE: this is internal and is wrapped to receive specific resources
 (defun time-series
-    (user resource-path &key start-date end-date period unit-system)
+    (user resource-path &key start-date end-date period)
   ;; FIXME: must provide end-date and exactly one of start-date and period
   (request user
            (format nil "/user/~a~a/date/~a/~a"
                    (user-id? user)
                    resource-path
                    (or start-date end-date)
-                   (or period end-date))
-           unit-system))
+                   (or period end-date))))
 
 (defmacro define-time-series (name path)
   `(defun ,(intern (format nil "~a-TIME-SERIES" (symbol-name name)))
-       (user &rest args &key start-date end-date period unit-system)
-     (declare (ignore start-date end-date period unit-system))
+       (user &rest args &key start-date end-date period)
+     (declare (ignore start-date end-date period))
      (apply #'time-series user ,path args)))
 
 (define-time-series calories-in "/foods/log/caloriesIn")
@@ -257,46 +243,40 @@
 (define-time-series bmi "/body/bmi")
 (define-time-series fat "/body/fat")
 
-(defun %activity (proxy activity-id &key unit-system)
-  (request proxy (format nil "/activities/~a" activity-id) unit-system))
+(defun %activity (proxy activity-id)
+  (request proxy (format nil "/activities/~a" activity-id)))
 
-(defun search-foods (proxy query &key unit-system)
-  (request proxy "/foods/search" unit-system :parameters `(("query" . ,query))))
+(defun search-foods (proxy query)
+  (request proxy "/foods/search" :parameters `(("query" . ,query))))
 
 (defun food-units (proxy)
-  (request proxy "/foods/units" nil))
+  (request proxy "/foods/units"))
 
-(defun devices (user &key unit-system)
+(defun devices (user)
   (mapcar (lambda (object) (parse-json 'device object :parent user))
-          (request user
-                   (format nil "/user/~a/devices" (user-id? user))
-                   unit-system)))
+          (request user (format nil "/user/~a/devices" (user-id? user)))))
 
-(defun device-attributes (device &key unit-system)
+(defun device-attributes (device)
   (parse-json 'device
               (car (request device
                             (format nil "/user/~a/devices/~a"
-                                    (user-id? device)
-                                    (slot-value device 'id))
-                            unit-system))
+                                    (user-id? device) (slot-value device 'id))))
               :existing-object device))
 
 ;;; Logging User Data
 
-(defmethod (setf weight) (weight user date &key unit-system)
+(defmethod (setf weight) (weight user date)
   (request user
            (format nil "/user/~a/body/weight" (user-id? user))
-           unit-system
            :request-method :post
            :parameters `(("weight" . ,(format nil "~a" weight))
                          ("date" . ,date)))
   weight)
 
 (defgeneric log (instance &key unit-system)
-  (:method ((instance activity-instance) &key unit-system)
+  (:method ((instance activity-instance))
     (request instance
              (format nil "/user/~a/activities" (user-id? instance))
-             unit-system
              :request-method :post
              :parameters `(("activityId" . ,(slot-value instance 'activity-id))
                            ("durationMillis" . ,(duration instance))
@@ -304,10 +284,9 @@
                            ;;("date")
                            ;;("startTime")
                            )))
-  (:method ((instance food-instance) &key unit-system)
+  (:method ((instance food-instance))
     (request instance
              (format nil "/user/~a/foods/log" (user-id? instance))
-             unit-system
              :request-method :post
              :parameters `(("foodId" . ,(slot-value instance 'food-id))
                            ("mealTypeId" . ,(slot-value instance
