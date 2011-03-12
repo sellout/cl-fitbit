@@ -7,32 +7,29 @@
            
            #:activities-for
            #:recent-activities #:frequent-activities #:favorite-activities
-           #:profile
            #:foods-for #:recent-foods #:frequent-foods #:favorite-foods
            
-           #:calories-in
+           #:calories-in-time-series
 
-           #:calories-out
-           #:steps
-           #:distance
-           #:time-sedentary
-           #:time-lightly-active
-           #:time-fairly-active
-           #:time-very-active
-           #:active-score
+           #:calories-out-time-series
+           #:steps-time-series
+           #:distance-time-series
+           #:time-sedentary-time-series
+           #:time-lightly-active-time-series
+           #:time-fairly-active-time-series
+           #:time-very-active-time-series
+           #:active-score-time-series
 
-           #:time-asleep
-           #:time-awake
-           #:awakenings
-           #:time-in-bed
+           #:time-asleep-time-series
+           #:time-awake-time-series
+           #:awakenings-time-series
+           #:time-in-bed-time-series
 
-           #:weight
-           #:bmi
-           #:fat
+           #:weight-time-series
+           #:bmi-time-series
+           #:fat-time-series
 
-           #:activity
            #:search-foods
            #:food-units
            
-           #:devices
-           #:device-attributes))
+           #:devices))
