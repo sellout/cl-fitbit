@@ -34,7 +34,6 @@
                                 (find slot-name
                                       (class-slots (find-class class))
                                       :key #'slot-definition-name))))
-                    (format t "~a ~a" field type)
                     (setf (slot-value existing-object slot-name)
                           (parse-value existing-object slot-name type value)))
                 (error (c)
