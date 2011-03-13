@@ -11,9 +11,15 @@
 (defun parse-json
     (class json &key parent (existing-object (make-instance class)))
   (mapcar (lambda (pair)
-            (setf (slot-value existing-object
-                              (find-symbol (symbol-name (car pair)) :fitbit))
-                  (cdr pair)))
+            (let ((field (car pair))
+                  (value (cdr pair)))
+              (handler-case
+                  (setf (slot-value existing-object
+                                    (find-symbol (symbol-name field) :fitbit))
+                        value)
+                (error ()
+                  (warn "Ignoring value ~a for unsupported field ~a"
+                        value field)))))
           json)
   (if parent
       (setf (slot-value existing-object 'parent) parent))
