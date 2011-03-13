@@ -88,8 +88,8 @@
    (name :reader name)))
 
 (defclass activity (user-proxy)
-  ((activity-levels :reader levels)
-   (has-speed-p :reader has-speed-p)
+  ((activity-levels :reader levels :type (list* activity-level))
+   (has-speed :reader has-speed-p)
    id
    (name :reader name)))
 
@@ -406,7 +406,10 @@
 ;;; General Activity Data
 
 (defun %activity (proxy activity-id)
-  (request proxy (format nil "/activities/~a" activity-id)))
+  (parse-json 'activity
+              (cdr (first (request proxy
+                                   (format nil "/activities/~a" activity-id))))
+              :parent proxy))
 
 ;;; General Food Data
 
