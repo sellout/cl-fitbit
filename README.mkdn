@@ -1,0 +1,40 @@
+# fitbit API for Common Lisp
+
+This implements the [fitbit API](http://dev.fitbit.com/) so you can read and
+edit fitbit users’ information from your Common Lisp apps.
+
+## example usage
+
+    ;;; Do this just once in the lifetime of your app
+     
+    (defvar *consumer* (fitbit:initialize-consumer "<key>" "<secret>"))
+    
+    ;;; Any time a user wants to associate their account with their fitbit
+    ;;; account, do this
+    
+    ;; 1. send the user to the URL returned by
+    (get-authentication-url *consumer* "<callback-uri>")
+    ;; 2. set up a handler at <callback-uri> that calls this and holds onto
+    ;;    the result
+    (get-authorized-user *consumer* "<callback-uri+params>")
+    
+    ;;; Now that you have an authorized-user object, the world is your oyster:
+    
+    (city auth-user)
+    => "Los Angeles"
+    (devices auth-user)
+    => (#<DEVICE> #<DEVICE>)
+    (recent-activities auth-user)
+    => (#<ACTIVITY-INSTANCE> #<ACTIVITY-INSTANCE>)
+    (activity-levels (activity (car *)))
+    => (#<ACTIVITY-LEVEL> #<ACTIVITY-LEVEL>)
+    
+    ;; units depends on value of (unit-system auth-user)
+    (setf (weight auth-user) 185)
+    => 185
+    
+    (defvar some-other-user (make-user "<id>" :parent auth-user)
+    (city some-other-user)
+    => "Cambridge"
+    (devices some-other-user)
+    => (error "Not allowed")
