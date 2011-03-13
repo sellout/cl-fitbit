@@ -3,6 +3,8 @@
 This implements the [fitbit API](http://dev.fitbit.com/) so you can read and
 edit fitbit users’ information from your Common Lisp apps.
 
+**NOTE**: This currently depends on [my fork of cl-oauth](sellout/cl-oauth).
+
 ## example usage
 
     ;;; Do this just once in the lifetime of your app
