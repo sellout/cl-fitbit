@@ -8,24 +8,38 @@
 (defvar +auth-request-url+ (merge-uris "/oauth/authorize" +base-url+))
 (defvar +access-url+ (merge-uris "/oauth/access_token" +base-url+))
 
+(defgeneric parse-value (existing-object slot-name slot-type value)
+  (:method (existing-object slot-name slot-type value)
+    (cond ((subtypep (find-class slot-type) 'user-proxy)
+           (parse-json slot-type value :parent existing-object))
+          ((eq slot-type 'list)
+           (mapcar (lambda (v)
+                     (parse-json (find-symbol (string-right-trim
+                                               '(#\S)
+                                               (symbol-name slot-name))
+                                              :fitbit)
+                                 v
+                                 :parent existing-object))
+                   value))
+          (t value))))
+
 (defun parse-json
     (class json &key parent (existing-object (make-instance class)))
   (mapcar (lambda (pair)
-            (let* ((field (car pair))
-                   (value (cdr pair))
-                   (slot-name (find-symbol (symbol-name field) :fitbit))
-                   (slot-type (slot-definition-type (find slot-name
-                                                          (class-slots (find-class class))
-                                                          :key #'slot-definition-name))))
+            (let ((field (car pair))
+                  (value (cdr pair)))
               (handler-case
-                  (setf (slot-value existing-object slot-name)
-                        (cond ((subtypep (find-class slot-type) 'user-proxy)
-                               (parse-json slot-type value
-                                           :parent existing-object))
-                              (t value)))
-                (error ()
-                  (warn "Ignoring value ~a for unsupported field ~a"
-                        value field)))))
+                  (let* ((slot-name (find-symbol (symbol-name field) :fitbit))
+                         (type (slot-definition-type
+                                (find slot-name
+                                      (class-slots (find-class class))
+                                      :key #'slot-definition-name))))
+                    (format t "~a ~a" field type)
+                    (setf (slot-value existing-object slot-name)
+                          (parse-value existing-object slot-name type value)))
+                (error (c)
+                  (warn "Ignoring value ~a for unsupported field ~a: ~a"
+                        value field c)))))
           json)
   (if parent
       (setf (slot-value existing-object 'parent) parent))
@@ -83,12 +97,12 @@
 
 (defclass activity-level (user-proxy)
   (id
-   (min-speed :reader minimum-speed)
-   (max-speed :reader maximum-speed)
+   (min-speed-+mph+ :reader minimum-speed)
+   (max-speed-+mph+ :reader maximum-speed)
    (name :reader name)))
 
 (defclass activity (user-proxy)
-  ((activity-levels :reader levels :type (list* activity-level))
+  ((activity-levels :reader levels :type list)
    (has-speed :reader has-speed-p)
    id
    (name :reader name)))
