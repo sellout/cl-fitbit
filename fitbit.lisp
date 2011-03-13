@@ -137,9 +137,9 @@
                  :unit-system unit-system))
 
 (defgeneric request
-    (user resource-url &key request-method parameters)
+    (instance resource-url &key method parameters)
   (:method ((instance authorized-user) resource-url
-            &key (request-method :get) parameters)
+            &key (method :get) parameters)
     (let ((result (access-protected-resource
                    (merge-uris (format nil
                                        "/~a~a.json"
@@ -147,7 +147,7 @@
                                        resource-url)
                                +base-url+)
                    (access-token instance)
-                   :request-method request-method
+                   :request-method method
                    :user-parameters parameters
                    :additional-headers (case (unit-system instance)
                                          (:us '(("Accept-Language" . "en_US")))
@@ -157,8 +157,8 @@
                                    result
                                    (babel:octets-to-string result)))))
   (:method ((instance user-proxy) resource-url &rest args
-            &key (request-method :get) parameters)
-    (declare (ignore request-method parameters))
+            &key (method :get) parameters)
+    (declare (ignore method parameters))
     (apply #'request (parent instance) resource-url args)))
 
 (defgeneric user-id? (user)
@@ -255,7 +255,7 @@
 (defmethod (setf weight) (weight user date)
   (request user
            (format nil "/user/~a/body/weight" (user-id? user))
-           :request-method :post
+           :method :post
            :parameters `(("weight" . ,(format nil "~a" weight))
                          ("date" . ,date)))
   weight)
@@ -264,7 +264,7 @@
   (:method ((instance activity-instance))
     (request instance
              (format nil "/user/~a/activities" (user-id? instance))
-             :request-method :post
+             :method :post
              :parameters `(("activityId" . ,(slot-value instance 'activity-id))
                            ("durationMillis" . ,(duration instance))
                            ("distance" . ,(distance instance)) 
@@ -274,7 +274,7 @@
   (:method ((instance food-instance))
     (request instance
              (format nil "/user/~a/foods/log" (user-id? instance))
-             :request-method :post
+             :method :post
              :parameters `(("foodId" . ,(slot-value instance 'food-id))
                            ("mealTypeId" . ,(slot-value instance
                                                             'meal-type-id))
@@ -288,12 +288,12 @@
     (request instance
              (format nil "/user/~a/activities/log/favorite/~a"
                      (user-id? instance) (slot-value instance 'id))
-             :request-method :post))
+             :method :post))
   (:method ((instance food))
     (request instance
              (format nil "/user/~a/foods/log/favorite/~a"
                      (user-id? instance) (slot-value instance 'id))
-             :request-method :post)))
+             :method :post)))
 
 ;;; Deleting User Data
 
