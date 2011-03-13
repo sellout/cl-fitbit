@@ -66,6 +66,10 @@
    (stride-length-walking :reader walking-stride-length)
    (timezone :reader timezone)))
 
+(defmethod print-object ((obj user) stream)
+  (print-unreadable-object (obj stream :type t)
+    (format stream "~a" (display-name obj))))
+
 (defclass authorized-user (user)
   ((access-token :initarg access-token)
    (unit-system :initform nil :initarg :unit-system :accessor unit-system)))
@@ -100,11 +104,19 @@
    (max-speed-+mph+ :reader maximum-speed)
    (name :reader name)))
 
+(defmethod print-object ((obj activity-level) stream)
+  (print-unreadable-object (obj stream :type t)
+    (format stream "~a" (name obj))))
+
 (defclass activity (user-proxy)
   ((activity-levels :reader levels :type list)
    (has-speed :reader has-speed-p)
    id
    (name :reader name)))
+
+(defmethod print-object ((obj activity) stream)
+  (print-unreadable-object (obj stream :type t)
+    (format stream "~a" (name obj))))
 
 (defclass activity-instance (user-proxy)
   ((activity :accessor activity)
@@ -114,6 +126,10 @@
    (distance :initarg :distance :accessor distance)
    (duration :initarg :duration :accessor duration)
    (name :reader name)))
+
+(defmethod print-object ((obj activity-instance) stream)
+  (print-unreadable-object (obj stream :type t)
+    (format stream "~a" (name obj))))
 
 (defmethod slot-unbound :around
     (class (instance activity-instance) (slot-name (eql 'activity)))
@@ -144,11 +160,19 @@
    (name :reader name)
    (plural :reader plural)))
 
+(defmethod print-object ((obj unit) stream)
+  (print-unreadable-object (obj stream :type t)
+    (format stream "~a" (name obj))))
+
 (defclass food (user-proxy)
   ((brand :reader brand)
    food-id
    (name :reader name)
    (units :reader units)))
+
+(defmethod print-object ((obj food) stream)
+  (print-unreadable-object (obj stream :type t)
+    (format stream "~a" (name obj))))
 
 (defclass food-instance (user-proxy)
   ((amount :initarg amount :accessor amount)
@@ -161,6 +185,10 @@
    (name :reader name)
    (unit :initarg unit :accessor unit)
    (units :reader units)))
+
+(defmethod print-object ((obj food-instance) stream)
+  (print-unreadable-object (obj stream :type t)
+    (format stream "~a" (name obj))))
 
 #| FIXME: no way to find food or meal-type object?
 (defmethod slot-unbound :around
@@ -180,8 +208,12 @@
   ((is-favorite :reader favorite-p)
    (log-date :reader date)
    log-id
-   (logged-food :reader logged-food :type food-instance)
+   (logged-food :reader food-instance :type food-instance)
    (nutritional-values :reader nutritional-values :type nutritional-values)))
+
+(defmethod print-object ((obj food-log-entry) stream)
+  (print-unreadable-object (obj stream :type t)
+    (format stream "~a" (name (food-instance obj)))))
 
 (defclass nutritional-values (user-proxy)
   ((calories :reader calories)
