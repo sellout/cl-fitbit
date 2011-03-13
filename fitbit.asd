@@ -4,7 +4,7 @@
 (in-package #:fitbit-system)
 
 (defsystem fitbit
-  :depends-on (drakma cl-oauth cl-json local-time)
+  :depends-on (drakma cl-oauth cl-json local-time closer-mop)
   :serial t
   :components ((:file "package")
                (:file "fitbit")))

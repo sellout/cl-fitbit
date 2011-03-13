@@ -11,12 +11,18 @@
 (defun parse-json
     (class json &key parent (existing-object (make-instance class)))
   (mapcar (lambda (pair)
-            (let ((field (car pair))
-                  (value (cdr pair)))
+            (let* ((field (car pair))
+                   (value (cdr pair))
+                   (slot-name (find-symbol (symbol-name field) :fitbit))
+                   (slot-type (slot-definition-type (find slot-name
+                                                          (class-slots (find-class class))
+                                                          :key #'slot-definition-name))))
               (handler-case
-                  (setf (slot-value existing-object
-                                    (find-symbol (symbol-name field) :fitbit))
-                        value)
+                  (setf (slot-value existing-object slot-name)
+                        (cond ((subtypep (find-class slot-type) 'user-proxy)
+                               (parse-json slot-type value
+                                           :parent existing-object))
+                              (t value)))
                 (error ()
                   (warn "Ignoring value ~a for unsupported field ~a"
                         value field)))))
@@ -128,8 +134,8 @@
   ((is-favorite :reader is-favorite)
    (log-date :reader log-date)
    log-id
-   (logged-food :reader logged-food)
-   (nutritional-values :reader nutritional-values)))
+   (logged-food :reader logged-food :type food-instance)
+   (nutritional-values :reader nutritional-values :type nutritional-values)))
 
 (defclass nutritional-values (user-proxy)
   ((calories :reader calories)
