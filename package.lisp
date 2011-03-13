@@ -4,6 +4,7 @@
   (:export #:make-fitbit-consumer
            #:get-authentication-url
            #:get-authorized-user
+           #:make-user
            
            #:activities-for
            #:recent-activities #:frequent-activities #:favorite-activities

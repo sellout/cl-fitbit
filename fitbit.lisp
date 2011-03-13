@@ -60,6 +60,9 @@
 (defclass target-user (user-proxy user)
   ())
 
+(defun make-user (encoded-id authorized-user)
+  (make-instance 'target-user :encoded-id encoded-id :parent authorized-user))
+
 (defmethod slot-unbound :around (class (instance user) slot-name)
   (declare (ignorable class))
   (profile instance)
