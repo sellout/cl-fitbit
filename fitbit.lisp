@@ -42,23 +42,23 @@
    (country :reader country)
    (date-of-birth :reader date-of-birth)
    (display-name :reader display-name)
-   (encoded-id :initarg :encoded-id :reader encoded-id)
+   (encoded-id :initarg :encoded-id)
    (full-name :reader full-name)
    (gender :reader gender)
    (height :reader height)
    (nickname :reader nickname)
-   (offset-from-+utc+-millis :reader offset-from-+utc+-millis)
+   (offset-from-+utc+-millis :reader offset-from-utc)
    (state :reader state)
-   (stride-length-running :reader stride-length-running)
-   (stride-length-walking :reader stride-length-walking)
+   (stride-length-running :reader running-stride-length)
+   (stride-length-walking :reader walking-stride-length)
    (timezone :reader timezone)))
 
 (defclass authorized-user (user)
-  ((access-token :initarg :access-token :reader access-token)
+  ((access-token :initarg access-token)
    (unit-system :initform nil :initarg :unit-system :accessor unit-system)))
 
 (defclass user-proxy ()
-  ((parent :initarg :parent :accessor parent :type parent))
+  ((parent :initarg :parent :accessor parent))
   (:documentation "All objects carry a reference to the object from which they
                    were created. This allows us to not have to pass around
                    multiple user objects everywhere."))
@@ -82,10 +82,16 @@
     (parse-json 'user (cdr object) :existing-object existing-user)))
 
 (defclass activity-level (user-proxy)
-  (id min-speed max-speed name))
+  (id
+   (min-speed :reader minimum-speed)
+   (max-speed :reader maximum-speed)
+   (name :reader name)))
 
 (defclass activity (user-proxy)
-  (activity-levels has-speed-p id name))
+  ((activity-levels :reader levels)
+   (has-speed-p :reader has-speed-p)
+   id
+   (name :reader name)))
 
 (defclass activity-instance (user-proxy)
   ((activity :accessor activity)
@@ -106,11 +112,19 @@
   (setf (slot-value instance 'activity-id) (slot-value activity 'id)))
 
 (defclass activity-summary (user-proxy)
-  (active-score calories-out distances fairly-active-minutes
-   lightly-active-minutes sedentary-minutes steps very-active-minutes))
+  ((active-score :reader active-score)
+   (calories-out :reader calories-out)
+   (distances :reader distances)
+   (fairly-active-minutes :reader time-fairly-active)
+   (lightly-active-minutes :reader time-lightly-active)
+   (sedentary-minutes :reader time-sedentary)
+   (steps :reader steps)
+   (very-active-minutes :reader time-very-active)))
 
 (defclass device (user-proxy)
-  (battery id type))
+  ((battery :reader battery)
+   id
+   (type :reader type)))
 
 (defclass unit (user-proxy)
   (id
@@ -118,21 +132,40 @@
    (plural :reader plural)))
 
 (defclass food (user-proxy)
-  (brand food-id name units))
+  ((brand :reader brand)
+   food-id
+   (name :reader name)
+   (units :reader units)))
 
 (defclass food-instance (user-proxy)
   ((amount :initarg amount :accessor amount)
    (brand :reader brand)
    (calories :reader calories)
    food-id
+   (food :reader food)
    meal-type-id
+   (meal-type :reader meal-type)
    (name :reader name)
    (unit :initarg unit :accessor unit)
-   units))
+   (units :reader units)))
+
+#| FIXME: no way to find food or meal-type object?
+(defmethod slot-unbound :around
+    (class (instance activity-instance) (slot-name (eql 'food)))
+  (declare (ignorable class))
+  (setf (slot-value instance slot-name)
+        (%food instance (slot-value instance 'food-id))))
+
+(defmethod slot-unbound :around
+    (class (instance activity-instance) (slot-name (eql 'meal-type)))
+  (declare (ignorable class))
+  (setf (slot-value instance slot-name)
+        (%meal-type instance (slot-value instance 'meal-type-id))))
+|#
 
 (defclass food-log-entry (user-proxy)
-  ((is-favorite :reader is-favorite)
-   (log-date :reader log-date)
+  ((is-favorite :reader favorite-p)
+   (log-date :reader date)
    log-id
    (logged-food :reader logged-food :type food-instance)
    (nutritional-values :reader nutritional-values :type nutritional-values)))
@@ -168,7 +201,7 @@
 
 (defun get-authorized-user (consumer uri &key unit-system)
   (make-instance 'authorized-user
-                 :access-token (get-access-token consumer uri)
+                 'access-token (get-access-token consumer uri)
                  :unit-system unit-system))
 
 (defgeneric request
@@ -181,7 +214,7 @@
                                        +api-version+
                                        resource-url)
                                +base-url+)
-                   (access-token instance)
+                   (slot-value instance 'access-token)
                    :request-method method
                    :user-parameters parameters
                    :additional-headers (case (unit-system instance)
@@ -194,14 +227,14 @@
   (:method ((instance user-proxy) resource-url &rest args
             &key (method :get) parameters)
     (declare (ignore method parameters))
-    (apply #'request (parent instance) resource-url args)))
+    (apply #'request (slot-value instance 'parent) resource-url args)))
 
 (defgeneric user-id? (user)
   (:documentation "This gets the user-id of the “nearest” user to the object, or
                    “-” in the case of an authorized user.")
   (:method ((instance authorized-user)) "-")
-  (:method ((instance target-user))     (encoded-id instance))
-  (:method ((instance user-proxy))      (user-id? (parent instance))))
+  (:method ((instance target-user)) (slot-value instance 'encoded-id))
+  (:method ((instance user-proxy)) (user-id? (slot-value instance 'parent))))
 
 (defun activities-for (user date)
   (let ((json (request user
