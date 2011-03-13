@@ -103,8 +103,13 @@
 (defclass device (user-proxy)
   (battery id type))
 
+(defclass unit (user-proxy)
+  (id
+   (name :reader name)
+   (plural :reader plural)))
+
 (defclass food (user-proxy)
-  (brand id name units))
+  (brand food-id name units))
 
 (defclass food-instance (user-proxy)
   ((amount :initarg amount :accessor amount)
@@ -116,8 +121,23 @@
    (unit :initarg unit :accessor unit)
    units))
 
-(defclass food-unit (user-proxy)
-  (name plural id))
+(defclass food-log-entry (user-proxy)
+  ((is-favorite :reader is-favorite)
+   (log-date :reader log-date)
+   log-id
+   (logged-food :reader logged-food)
+   (nutritional-values :reader nutritional-values)))
+
+(defclass nutritional-values (user-proxy)
+  ((calories :reader calories)
+   (carbs :reader carbs)
+   (fat :reader fat)
+   (fiber :reader fiber)
+   (protein :reader protein)
+   (sodium :reader sodium)))
+
+(defclass food-summary (nutritional-values)
+  ((water :reader water)))
 
 (defun make-fitbit-consumer (key secret)
   (make-consumer-token :key key :secret secret))
@@ -205,29 +225,43 @@
               user))
 
 (defun foods-for (user date)
-  (request user
-           (format nil "/user/~a/foods/log/date/~a" (user-id? user) date)))
+  (let ((json (request user
+                       (format nil "/user/~a/foods/log/date/~a"
+                               (user-id? user) date))))
+    (values (mapcar (lambda (object)
+                      (parse-json 'food-log-entry object :parent user))
+                    (cdr (first json)))
+            (parse-json 'food-summary (cdr (second json)) :parent user))))
 
 (defun recent-foods (user)
-  (request user
-           (format nil "/user/~a/foods/log/recent" (user-id? user))))
+  (mapcar (lambda (object) (parse-json 'food-instance object :parent user))
+          (request user
+                   (format nil "/user/~a/foods/log/recent" (user-id? user)))))
 
 (defun frequent-foods (user)
-  (request user (format nil "/user/~a/foods/log/frequent" (user-id? user))))
+  (mapcar (lambda (object) (parse-json 'food-instance object :parent user))
+          (request user
+                   (format nil "/user/~a/foods/log/frequent" (user-id? user)))))
 
 (defun favorite-foods (user)
-  (request user (format nil "/user/~a/foods/log/favorite" (user-id? user))))
+  (mapcar (lambda (object) (parse-json 'food-instance object :parent user))
+          (request user
+                   (format nil "/user/~a/foods/log/favorite" (user-id? user)))))
 
 ;; NOTE: this is internal and is wrapped to receive specific resources
 (defun time-series
     (user resource-path &key start-date end-date period)
-  ;; FIXME: must provide end-date and exactly one of start-date and period
-  (request user
-           (format nil "/user/~a~a/date/~a/~a"
-                   (user-id? user)
-                   resource-path
-                   (or start-date end-date)
-                   (or period end-date))))
+  "Returns an ordered alist of (timestamp . value). END-DATE must be provided,
+   along with exactly one of START-DATE and PERIOD."
+  ;; FIXME: ensure end-date and exactly one of start-date and period are
+  ;;        provided
+  (mapcar (lambda (pair) (cons (cdr (first pair)) (cdr (second pair))))
+          (cdar (request user
+                         (format nil "/user/~a~a/date/~a/~a"
+                                 (user-id? user)
+                                 resource-path
+                                 (or start-date end-date)
+                                 (or period end-date))))))
 
 (defmacro define-time-series (name path)
   `(defun ,(intern (format nil "~a-TIME-SERIES" (symbol-name name)))
@@ -298,7 +332,7 @@
   (:method ((instance food))
     (request instance
              (format nil "/user/~a/foods/log/favorite/~a"
-                     (user-id? instance) (slot-value instance 'id))
+                     (user-id? instance) (slot-value instance 'food-id))
              :method :post)))
 
 ;;; Deleting User Data
@@ -324,7 +358,7 @@
   (:method ((instance food))
     (request instance
              (format nil "/user/~a/foods/favorite/~a"
-                     (user-id? instance) (slot-value instance 'id))
+                     (user-id? instance) (slot-value instance 'food-id))
              :method :delete)))
 
 ;;; General Activity Data
@@ -335,10 +369,13 @@
 ;;; General Food Data
 
 (defun search-foods (proxy query)
-  (request proxy "/foods/search" :parameters `(("query" . ,query))))
+  (mapcar (lambda (object) (parse-json 'food object :parent proxy))
+          (cdar (request proxy "/foods/search"
+                         :parameters `(("query" . ,query))))))
 
 (defun food-units (proxy)
-  (request proxy "/foods/units"))
+  (mapcar (lambda (object) (parse-json 'unit object :parent proxy))
+          (request proxy "/foods/units")))
 
 ;;; Device Data
 
