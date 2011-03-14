@@ -2,7 +2,7 @@
   (:use #:cl #:drakma #:oauth #:json #:split-sequence #:puri #:closer-mop)
   (:shadowing-import-from #:cl #:standard-method #:standard-generic-function
                                #:defmethod #:defgeneric #:standard-class)
-  (:shadow #:request)
+  (:shadow #:log #:request)
   (:export #:make-fitbit-consumer
            #:get-authentication-url
            #:get-authorized-user
