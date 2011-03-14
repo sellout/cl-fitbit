@@ -250,9 +250,9 @@
                  :unit-system unit-system))
 
 (defgeneric request
-    (instance resource-url &key method parameters)
+    (instance resource-url &key method parameters additional-headers)
   (:method ((instance authorized-user) resource-url
-            &key (method :get) parameters)
+            &key (method :get) parameters additional-headers)
     (let ((result (access-protected-resource
                    (merge-uris (format nil
                                        "/~a~a.json"
@@ -262,16 +262,17 @@
                    (slot-value instance 'access-token)
                    :request-method method
                    :user-parameters parameters
-                   :additional-headers (case (unit-system instance)
-                                         (:us '(("Accept-Language" . "en_US")))
-                                         (:uk '(("Accept-Language" . "en_UK")))
-                                         (otherwise '())))))
+                   :additional-headers (append (case (unit-system instance)
+                                                 (:us '(("Accept-Language" . "en_US")))
+                                                 (:uk '(("Accept-Language" . "en_UK")))
+                                                 (otherwise '()))
+                                               additional-headers))))
       (decode-json-from-string (if (stringp result)
                                    result
                                    (babel:octets-to-string result)))))
-  (:method ((instance user-proxy) resource-url &rest args
-            &key (method :get) parameters)
-    (declare (ignore method parameters))
+  (:method ((instance user-proxy) resource-url
+            &rest args &key (method :get) parameters additional-headers)
+    (declare (ignore method parameters additional-headers))
     (apply #'request (slot-value instance 'parent) resource-url args)))
 
 (defgeneric user-id? (user)
