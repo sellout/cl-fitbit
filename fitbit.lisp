@@ -234,19 +234,27 @@
                       (if callback-url (list :callback-uri callback-url)))))
     (make-authorization-uri +auth-request-url+ token)))
 
-(defun get-access-token (consumer uri)
-  (let* ((query (mapcar (lambda (param) (split-sequence #\= param))
-                        (split-sequence #\& (uri-query uri))))
-         (token (cadr (assoc "oauth_token" query :test #'string=)))
-         (verifier (cadr (assoc "oauth_verifier" query :test #'string=)))
-         (request-token (make-request-token :key token
-                                            :verification-code verifier)))
-    (setf (request-token-authorized-p request-token) t)
-    (obtain-access-token +access-url+ request-token :consumer-token consumer)))
+(defgeneric get-access-token (consumer auth-response)
+  "Auth response can be either a full URI or an alist of the query parameters."
+  (:method (consumer (auth-response list))
+    (let* ((token (cdr (assoc "oauth_token" auth-response :test #'string=)))
+           (verifier (cdr (assoc "oauth_verifier" auth-response
+                                 :test #'string=)))
+           (request-token (make-request-token :key token
+                                              :verification-code verifier)))
+      (setf (request-token-authorized-p request-token) t)
+      (obtain-access-token +access-url+ request-token
+                           :consumer-token consumer)))
+  (:method (consumer (auth-response uri))
+    (get-access-token consumer
+                      (mapcar (lambda (param)
+                                (let ((list (split-sequence #\= param)))
+                                  (cons (first list) (second list))))
+                              (split-sequence #\& (uri-query auth-response))))))
 
-(defun get-authorized-user (consumer uri &key unit-system)
+(defun get-authorized-user (consumer auth-response &key unit-system)
   (make-instance 'authorized-user
-                 'access-token (get-access-token consumer uri)
+                 'access-token (get-access-token consumer auth-response)
                  :unit-system unit-system))
 
 (defgeneric request
