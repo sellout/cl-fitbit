@@ -235,7 +235,8 @@
     (make-authorization-uri +auth-request-url+ token)))
 
 (defgeneric get-access-token (consumer auth-response)
-  "Auth response can be either a full URI or an alist of the query parameters."
+  (:documentation "Auth response can be either a full URI or an alist of the
+                   query parameters.")
   (:method (consumer (auth-response list))
     (let* ((token (cdr (assoc "oauth_token" auth-response :test #'string=)))
            (verifier (cdr (assoc "oauth_verifier" auth-response
